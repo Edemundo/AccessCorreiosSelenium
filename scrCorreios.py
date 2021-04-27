@@ -17,6 +17,9 @@ sheet = workbook.active
 ceps = []
 i = 2
 
+# Abrindo o Google Chrome na página dos correios
+driver.get("https://buscacepinter.correios.com.br/app/endereco/index.php?t")
+
 # Populando vetor ceps com planilha
 while(True):
   ceps.append(sheet.cell(row = i, column=1).value)
@@ -56,33 +59,32 @@ workbookNotFind.save(filename="Ceps Não Encontrados.xlsx")
 contEncontrados = 2
 contNaoEncontrados = 2
 for i in range(len(ceps)):
-  driver.get("https://buscacepinter.correios.com.br/app/endereco/index.php?t")
-  cep_end_elem = WebDriverWait(driver, 20).until(
+  cep_end_elem = WebDriverWait(driver, 1000).until(
     EC.presence_of_element_located((By.XPATH, "//input[@name='endereco']"))
   )
   cep_end_elem.clear()
   cep_end_elem.send_keys(ceps[i])
 
-  btn_pesquisar_elem = WebDriverWait(driver, 20).until(
+  btn_pesquisar_elem = WebDriverWait(driver, 1000).until(
     EC.presence_of_element_located((By.XPATH, "//button[@name='btn_pesquisar']"))
   )
   btn_pesquisar_elem.click()
 
   # Caso o CEP exista serão extraidas essas informações
   try:
-    td_logradouro_elem = WebDriverWait(driver, 20).until(
+    td_logradouro_elem = WebDriverWait(driver, 1000).until(
       EC.presence_of_element_located((By.XPATH, "//td[@data-th='Logradouro/Nome']"))
     )
 
-    td_bairro_elem = WebDriverWait(driver, 20).until(
+    td_bairro_elem = WebDriverWait(driver, 1000).until(
       EC.presence_of_element_located((By.XPATH, "//td[@data-th='Bairro/Distrito']"))
     )
 
-    td_localidade_elem = WebDriverWait(driver, 20).until(
+    td_localidade_elem = WebDriverWait(driver, 1000).until(
       EC.presence_of_element_located((By.XPATH, "//td[@data-th='Localidade/UF']"))
     )
 
-    td_cep_elem = WebDriverWait(driver, 20).until(
+    td_cep_elem = WebDriverWait(driver, 1000).until(
       EC.presence_of_element_located((By.XPATH, "//td[@data-th='CEP']"))
     )
 
@@ -106,11 +108,19 @@ for i in range(len(ceps)):
     sheetNova[linhaColunaLocal] = td_localidade_elem.text
     contEncontrados = contEncontrados + 1
     workbookNova.save(filename="Ceps Encontrados.xlsx")
+    print("CEP:", td_cep_elem.text, "adicionado.", "CEPS SALVOS:", i)
 
   except:
     # Populando nova planilha com informações do cep não encontrado
     linhaColunaCEP = "A" + str(contNaoEncontrados)
     sheetNotFind[linhaColunaCEP] = ceps[i]
     workbookNotFind.save(filename="Ceps Não Encontrados.xlsx")
+    print("CEP: ", td_cep_elem.text, " não foi encontrado."), "CEPS SALVOS:", i
+
+  btn_voltar_elem = WebDriverWait(driver, 1000).until(
+    EC.presence_of_element_located((By.XPATH, "//button[@name='btn_voltar']"))
+  )
+  btn_voltar_elem.click()
+  time.sleep(1)
 
 driver.close()
