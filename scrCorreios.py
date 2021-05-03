@@ -115,7 +115,7 @@ for i in range(len(ceps)):
     linhaColunaCEP = "A" + str(contNaoEncontrados)
     sheetNotFind[linhaColunaCEP] = ceps[i]
     workbookNotFind.save(filename="Ceps Não Encontrados.xlsx")
-    print("CEP: ", td_cep_elem.text, " não foi encontrado."), "CEPS SALVOS:", i
+    print("CEP: ", td_cep_elem.text, " não foi encontrado.", "CEPS SALVOS:", i)
 
   btn_voltar_elem = WebDriverWait(driver, 1000).until(
     EC.presence_of_element_located((By.XPATH, "//button[@name='btn_voltar']"))
