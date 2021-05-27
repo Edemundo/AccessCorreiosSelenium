@@ -1,9 +1,7 @@
 import sys
-
+import re
 import time
-
-import mysql.connector
-from mysql.connector import MySQLConnection, Error
+#import mysql.connector
 
 import openpyxl
 from openpyxl import Workbook
@@ -15,11 +13,13 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-# connection = None
-# try:
-#   connection = mysql.connector.connect(host='10.20.3.6:3306', database='dw_covs', user='victordesgm', password='covs123')
-# except Error as e:
-#   print("Error while connecting to MySQL", e)
+# db = mysql.connector.connect(
+#   host="10.20.3.6",
+#   user="victordesgm",
+#   passwd="covs123",
+#   database="dw_covs"
+# )
+# mycursor = db.cursor()
 
 def tratamentoLogradouro(logradouro):
 
@@ -367,6 +367,7 @@ def tratamentoLogradouro(logradouro):
 
   logradouro = prefixLogradouro + " " + sufixLograd + " " + restoLograd
   logradouro = logradouro.strip()
+  logradouro = re.sub(' +', ' ', logradouro)
   return logradouro
 
 def correiosCaller(contEncontrados, contNaoEncontrados, contTotalBuscaCorreios, indiceBaseNova, countNumCepsSPGFC,
@@ -399,56 +400,68 @@ def correiosCaller(contEncontrados, contNaoEncontrados, contTotalBuscaCorreios, 
           EC.presence_of_element_located((By.XPATH, "//td[@data-th='CEP']"))
         )
 
-        # Subistituindo o traço por vazio nos ceps
+        td_bairro_elem = WebDriverWait(driver, 10).until(
+          EC.presence_of_element_located((By.XPATH, "//td[@data-th='Bairro/Distrito']"))
+        )
+
+        td_localidade_elem = WebDriverWait(driver, 10).until(
+          EC.presence_of_element_located((By.XPATH, "//td[@data-th='Localidade/UF']"))
+        )
+        # Subistituindo o traço por vazio nos ceps e tratando o logradouro
         ReplaceDashCep = td_cep_elem.text.replace('-', '')
+        logTratado = tratamentoLogradouro(td_logradouro_elem.text)
 
         # Populando a planilha de encontrados com informações do cep encontrado no site dos correios
         linhaColunaCEPBaseNova = "A" + str(indiceBaseNova)
-        sheetNova[linhaColunaCEPBaseNova] = ReplaceDashCep
+        sheetNova[linhaColunaCEPBaseNova] = re.sub(' ', '', ReplaceDashCep)
 
         linhaColunaLograBaseNova = "B" + str(indiceBaseNova)
-        sheetNova[linhaColunaLograBaseNova] = td_logradouro_elem.text
+        sheetNova[linhaColunaLograBaseNova] = logTratado
 
         linhaColunaIdBaseNova = "C" + str(indiceBaseNova)
         sheetNova[linhaColunaIdBaseNova] = None
+
+        linhaColunaBairroBaseNova = "D" + str(indiceBaseNova)
+        sheetNova[linhaColunaBairroBaseNova] = td_bairro_elem.text.upper()
+
+        linhaColunaLocalidadeBaseNova = "E" + str(indiceBaseNova)
+        sheetNova[linhaColunaLocalidadeBaseNova] = td_localidade_elem.text.upper()
 
         workbookNova.save(filename="Ceps Encontrados.xlsx")
         indiceBaseNova += 1
 
         # Populando a planilha da Fundac (SPGFC)
         linhaColunaCEBaseSPGFC = "A" + str(countNumCepsSPGFC+2)
-        sheetBaseSPGFC[linhaColunaCEBaseSPGFC] = ReplaceDashCep
+        sheetBaseSPGFC[linhaColunaCEBaseSPGFC] = re.sub(' ', '', ReplaceDashCep)
 
         linhaColunaLograBaseSPGFC = "B" + str(countNumCepsSPGFC+2)
-        sheetBaseSPGFC[linhaColunaLograBaseSPGFC] = td_logradouro_elem.text
+        sheetBaseSPGFC[linhaColunaLograBaseSPGFC] = logTratado
 
         linhaColunaIdBaseSPGFC = "C" + str(countNumCepsSPGFC+2)
         sheetBaseSPGFC[linhaColunaIdBaseSPGFC] = countNumCepsSPGFC+1
+
+        linhaColunaBairroBaseSPGFC = "D" + str(countNumCepsSPGFC+2)
+        sheetBaseSPGFC[linhaColunaBairroBaseSPGFC] = td_bairro_elem.text.upper()
+
+        linhaColunaLocalidadeBaseSPGFC = "E" + str(countNumCepsSPGFC+2)
+        sheetBaseSPGFC[linhaColunaLocalidadeBaseSPGFC] = td_localidade_elem.text.upper()
 
         workbookBaseSPGFC.save(filename="BASE_RESERVA_CEPS_FUNDAC.xlsx")
         countNumCepsSPGFC += 1
         contEncontrados += 1
 
         # Inserindo valores encontrados no banco de dados
-        # query = "INSERT INTO books(CEP, logradouro) " \
-        # "VALUES(%s,%s)"
-        # args = (ReplaceDashCep, td_logradouro_elem.text)
-
         # try:
-        #   cursor = connection.cursor()
-        #   cursor.execute(query, args)
-        #   connection.commit()
-        # except Error as error:
-        #   print(error)
-        # finally:
-        #   cursor.close()
-        #   connection.close()
+        #   mycursor.execute("INSERT INTO tab_ceps_spgeo (cep, logradouro) VALUES (%s, %s)", (re.sub(' ', '', ReplaceDashCep), logTratado))
+        #   db.commit()
+        # except:
+        #   print("Não foi possível salvar CEP no banco de dados")
       except Exception as e:
         # Populando nova planilha com informações do cep não encontrado
         linhaColunaCEP = "A" + str(contNaoEncontrados+2)
         sheetNotFound[linhaColunaCEP] = cepsSiteCorreios[i]
         workbookNotFound.save(filename="Ceps Não Encontrados.xlsx")
-        print("CEP: ", cepsSiteCorreios[i], "não encontrado")
+        print("\nCEP: ", cepsSiteCorreios[i], "não encontrado")
         contNaoEncontrados += 1
 
       btn_voltar_elem = WebDriverWait(driver, 120).until(
@@ -461,7 +474,7 @@ def correiosCaller(contEncontrados, contNaoEncontrados, contTotalBuscaCorreios, 
       time.sleep(1)
   except Exception as e:
     print(e)
-    print("Ocorreu um erro ao acessar o site, a busca recomeçará em breve")
+    print("\nOcorreu um erro ao acessar o site, a busca recomeçará em breve")
     if(fluxoNormalAdicao == False):
 
       # exclui a ultima linha adicionada na planilha
@@ -472,11 +485,10 @@ def correiosCaller(contEncontrados, contNaoEncontrados, contTotalBuscaCorreios, 
     driver.close()
     correiosCaller(contEncontrados, contNaoEncontrados, contTotalBuscaCorreios, indiceBaseNova, countNumCepsSPGFC,
                    workbookNova, workbookNotFound, workbookBaseSPGFC, sheetNova, sheetNotFound, sheetBaseSPGFC)
-  finally:
-    print("CEPS encontrados no site dos correios: ", contEncontrados)
-    print("CEPS não encontrados no site dos correios: ", contNaoEncontrados)
 
-    driver.close()
+  print("CEPS encontrados no site dos correios: ", contEncontrados)
+  print("CEPS não encontrados no site dos correios: ", contNaoEncontrados)
+  driver.close()
 
 print("\t\t\t\t\t\t\t\tAPLICAÇÃO DE LIMPEZA DE PLANILHA DE CEPS - SPGEO")
 
@@ -675,18 +687,14 @@ contadorNaoEncontrados = 0
 try:
   for i in range(len(cepsNotFound)):
     for j in range(len(cepsBaseSPGFC)):
-
       if(cepsNotFound[i] == cepsBaseSPGFC[j]):
         linhaColunaCEPBaseNova = "A" + str(indiceBaseNova)
-        linhaColunaCEPBaseSPGFC = "A" + str(j+2)
         sheetNova[linhaColunaCEPBaseNova] = cepsBaseSPGFC[j]
 
         linhaColunaLograBaseNova = "B" + str(indiceBaseNova)
-        linhaColunaLograBaseSPGFC = "B" + str(j+2)
-        sheetNova[linhaColunaLograBaseNova] = cepsBaseSPGFC[j]
+        sheetNova[linhaColunaLograBaseNova] = logsBaseSPGFC[j]
 
         linhaColunaIdBaseNova = "C" + str(indiceBaseNova)
-        linhaColunaIdBaseSPGFC = "C" + str(j+2)
         sheetNova[linhaColunaIdBaseNova] = None
 
         # Logradouro não bate
